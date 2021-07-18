@@ -89,8 +89,6 @@ class AcrylicCompositor
 			DWORD cbData;
 		};
 
-
-
 		ComPtr<ID2D1Device1> d2Device;
 		ComPtr<ID3D11Device> d3d11Device;
 		ComPtr<IDXGIDevice2> dxgiDevice;
@@ -101,17 +99,17 @@ class AcrylicCompositor
 		ComPtr<IDCompositionDevice3> dcompDevice3;
 		ComPtr<IDCompositionTarget> dcompTarget;
 
-		ComPtr<IDCompositionVisual2> rootVisual;
-		ComPtr<IDCompositionVisual2> fallbackVisual;
-		ComPtr<IDCompositionVisual2> desktopWindowVisual;
-		ComPtr<IDCompositionVisual2> topLevelWindowVisual;
+		ComPtr<IDCompositionVisual2> mRootVisual;
+		ComPtr<IDCompositionVisual2> mFallbackVisual;
+		ComPtr<IDCompositionVisual2> mDesktopWindowVisual;
+		ComPtr<IDCompositionVisual2> mTopLevelWindowVisual;
 
 		#pragma region Acrylic Essentials
 
-		ComPtr<IDCompositionGaussianBlurEffect> blurEffect;
-		ComPtr<IDCompositionSaturationEffect> saturationEffect;
-		ComPtr<IDCompositionTranslateTransform> translateTransform;
-		ComPtr<IDCompositionRectangleClip> clip;
+		ComPtr<IDCompositionGaussianBlurEffect> mBlurEffect;
+		ComPtr<IDCompositionSaturationEffect> mSaturationEffect;
+		ComPtr<IDCompositionTranslateTransform> mTranslateTransform;
+		ComPtr<IDCompositionRectangleClip> mClip;
 
 		#pragma endregion
 

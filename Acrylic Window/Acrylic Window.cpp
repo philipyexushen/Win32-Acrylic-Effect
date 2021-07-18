@@ -14,14 +14,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 	wc.lpszClassName = CLASS_NAME;
 	RegisterClass(&wc);
 
-	HWND hwnd = CreateWindowEx(WS_EX_NOREDIRECTIONBITMAP, CLASS_NAME, L"Acrylic Window using Direct Composition", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
-
+	HWND hwnd = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, CLASS_NAME, L"Acrylic Window using Direct Composition",
+		WS_POPUP, 100, 200, 800, 600, NULL, NULL, hInstance, NULL);
+	// SetWindowLong(hwnd, GWL_STYLE, GetWindowLong(hwnd, GWL_STYLE) & ~WS_CAPTION);
 	if (hwnd == NULL)
 	{
 		return 0;
 	}
 
-	ShowWindow(hwnd, nCmdShow);
+	ShowWindow(hwnd, SW_SHOW);
 
 	compositor.reset(new AcrylicCompositor(hwnd));
 

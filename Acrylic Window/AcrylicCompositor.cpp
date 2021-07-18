@@ -24,37 +24,37 @@ bool AcrylicCompositor::SetAcrylicEffect(HWND hwnd, BackdropSource source, Acryl
 	CreateBackdrop(hwnd,source);
 	CreateCompositionVisual(hwnd);
 	CreateFallbackVisual();
-	fallbackVisual->SetContent(swapChain.Get());
-	rootVisual->RemoveAllVisuals();
+	mFallbackVisual->SetContent(swapChain.Get());
+	mRootVisual->RemoveAllVisuals();
+
+	SyncCoordinates(hwnd);
 	switch (source)
 	{
 		case AcrylicCompositor::BACKDROP_SOURCE_DESKTOP:
-			rootVisual->AddVisual(desktopWindowVisual.Get(), false, NULL);
-			rootVisual->AddVisual(fallbackVisual.Get(), true, desktopWindowVisual.Get());
+			mRootVisual->AddVisual(mDesktopWindowVisual.Get(), false, NULL);
+			mRootVisual->AddVisual(mFallbackVisual.Get(), true, mDesktopWindowVisual.Get());
 			break;
 		case AcrylicCompositor::BACKDROP_SOURCE_HOSTBACKDROP:
-			rootVisual->AddVisual(desktopWindowVisual.Get(), false, NULL);
-			rootVisual->AddVisual(topLevelWindowVisual.Get(), true, desktopWindowVisual.Get());
-			rootVisual->AddVisual(fallbackVisual.Get(), true, topLevelWindowVisual.Get());
+			mRootVisual->AddVisual(mDesktopWindowVisual.Get(), false, NULL);
+			mRootVisual->AddVisual(mTopLevelWindowVisual.Get(), true, mDesktopWindowVisual.Get());
+			mRootVisual->AddVisual(mFallbackVisual.Get(), true, mTopLevelWindowVisual.Get());
 			break;
 		default:
-			rootVisual->RemoveAllVisuals();
+			mRootVisual->RemoveAllVisuals();
 			break;
 	}
 	
-	rootVisual->SetClip(clip.Get());
-	rootVisual->SetTransform(translateTransform.Get());
+	mRootVisual->SetClip(mClip.Get());
+	mRootVisual->SetTransform(mTranslateTransform.Get());
 
-	saturationEffect->SetSaturation(params.saturationAmount);
+	mSaturationEffect->SetSaturation(params.saturationAmount);
 
-	blurEffect->SetBorderMode(D2D1_BORDER_MODE_HARD);
-	blurEffect->SetInput(0, saturationEffect.Get(), 0);
-	blurEffect->SetStandardDeviation(params.blurAmount);
+	mBlurEffect->SetBorderMode(D2D1_BORDER_MODE_HARD);
+	mBlurEffect->SetInput(0, mSaturationEffect.Get(), 0);
+	mBlurEffect->SetStandardDeviation(params.blurAmount);
 
-	rootVisual->SetEffect(blurEffect.Get());
+	mRootVisual->SetEffect(mBlurEffect.Get());
 	Commit();
-
-	SyncCoordinates(hwnd);
 
 	return true;
 }
@@ -80,7 +80,7 @@ bool AcrylicCompositor::InitDwmApi()
 
 bool AcrylicCompositor::CreateCompositionDevice()
 {
-	if (D3D11CreateDevice(0, D3D_DRIVER_TYPE_HARDWARE, NULL,D3D11_CREATE_DEVICE_BGRA_SUPPORT, NULL, 0, D3D11_SDK_VERSION, d3d11Device.GetAddressOf(), nullptr, nullptr) != S_OK)
+	if (D3D11CreateDevice(0, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_BGRA_SUPPORT, NULL, 0, D3D11_SDK_VERSION, d3d11Device.GetAddressOf(), nullptr, nullptr) != S_OK)
 	{
 		return false;
 	}
@@ -109,7 +109,6 @@ bool AcrylicCompositor::CreateCompositionDevice()
 	{
 		return false;
 	}
-
 	return true;
 }
 
@@ -127,7 +126,7 @@ bool AcrylicCompositor::CreateFallbackVisual()
 
 	d3d11Device.As(&dxgiDevice);
 
-	if (CreateDXGIFactory2(0, __uuidof(dxgiFactory), reinterpret_cast<void**>(dxgiFactory.GetAddressOf())) != S_OK)
+	if (CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, __uuidof(dxgiFactory), reinterpret_cast<void**>(dxgiFactory.GetAddressOf())) != S_OK)
 	{
 		return false;
 	}
@@ -159,7 +158,9 @@ bool AcrylicCompositor::CreateFallbackVisual()
 	deviceContext->BeginDraw();
 	deviceContext->Clear();
 	deviceContext->CreateSolidColorBrush(tintColor, fallbackBrush.GetAddressOf());
-	deviceContext->FillRectangle(fallbackRect, fallbackBrush.Get());
+
+	D2D1_ROUNDED_RECT roundRect{ fallbackRect, 20, 20 };
+	deviceContext->FillRoundedRectangle(roundRect, fallbackBrush.Get());
 	deviceContext->EndDraw();
 
 	if (swapChain->Present(1, 0)!=S_OK)
@@ -172,15 +173,15 @@ bool AcrylicCompositor::CreateFallbackVisual()
 
 bool AcrylicCompositor::CreateCompositionVisual(HWND hwnd)
 {
-	dcompDevice3->CreateVisual(&rootVisual);
-	dcompDevice3->CreateVisual(&fallbackVisual);
+	dcompDevice3->CreateVisual(&mRootVisual);
+	dcompDevice3->CreateVisual(&mFallbackVisual);
 
 	if (!CreateCompositionTarget(hwnd))
 	{
 		return false;
 	}
 
-	if (dcompTarget->SetRoot(rootVisual.Get()) != S_OK)
+	if (dcompTarget->SetRoot(mRootVisual.Get()) != S_OK)
 	{
 		return false;
 	}
@@ -214,13 +215,14 @@ bool AcrylicCompositor::CreateBackdrop(HWND hwnd,BackdropSource source)
 			thumbnail.fSourceClientAreaOnly = FALSE;
 			thumbnail.rcDestination = RECT{ 0, 0, thumbnailSize.cx, thumbnailSize.cy };
 			thumbnail.rcSource = RECT{ 0, 0, thumbnailSize.cx, thumbnailSize.cy };
-			if (DwmCreateSharedThumbnailVisual(hwnd, desktopWindow, 2, &thumbnail, dcompDevice.Get(), (void**)desktopWindowVisual.GetAddressOf(), &desktopThumbnail) != S_OK)
+			if (DwmCreateSharedThumbnailVisual(hwnd, desktopWindow, 2, &thumbnail, dcompDevice.Get(), (void**)mDesktopWindowVisual.GetAddressOf(), &desktopThumbnail) != S_OK)
 			{
 				return false;
 			}
 			break;
 		case BACKDROP_SOURCE_HOSTBACKDROP:
-			if (!CreateBackdrop(hwnd, BACKDROP_SOURCE_DESKTOP) || DwmCreateSharedMultiWindowVisual(hwnd, dcompDevice.Get(), (void**)topLevelWindowVisual.GetAddressOf(), &topLevelWindowThumbnail) != S_OK)
+			if (!CreateBackdrop(hwnd, BACKDROP_SOURCE_DESKTOP) 
+				|| DwmCreateSharedMultiWindowVisual(hwnd, dcompDevice.Get(), (void**)mTopLevelWindowVisual.GetAddressOf(), &topLevelWindowThumbnail) != S_OK)
 			{
 				return false;
 			}
@@ -237,19 +239,19 @@ bool AcrylicCompositor::CreateBackdrop(HWND hwnd,BackdropSource source)
 
 bool AcrylicCompositor::CreateEffectGraph(ComPtr<IDCompositionDevice3> dcompDevice3)
 {
-	if (dcompDevice3->CreateGaussianBlurEffect(blurEffect.GetAddressOf()) != S_OK)
+	if (dcompDevice3->CreateGaussianBlurEffect(mBlurEffect.GetAddressOf()) != S_OK)
 	{
 		return false;
 	}
-	if (dcompDevice3->CreateSaturationEffect(saturationEffect.GetAddressOf()) != S_OK)
+	if (dcompDevice3->CreateSaturationEffect(mSaturationEffect.GetAddressOf()) != S_OK)
 	{
 		return false;
 	}
-	if (dcompDevice3->CreateTranslateTransform(&translateTransform) != S_OK)
+	if (dcompDevice3->CreateTranslateTransform(&mTranslateTransform) != S_OK)
 	{
 		return false;
 	}
-	if (dcompDevice3->CreateRectangleClip(&clip) != S_OK)
+	if (dcompDevice3->CreateRectangleClip(&mClip) != S_OK)
 	{
 		return false;
 	}
@@ -259,14 +261,26 @@ bool AcrylicCompositor::CreateEffectGraph(ComPtr<IDCompositionDevice3> dcompDevi
 void AcrylicCompositor::SyncCoordinates(HWND hwnd)
 {
 	GetWindowRect(hwnd, &hostWindowRect);
-	clip->SetLeft((float)hostWindowRect.left);
-	clip->SetRight((float)hostWindowRect.right);
-	clip->SetTop((float)hostWindowRect.top);
-	clip->SetBottom((float)hostWindowRect.bottom);
-	rootVisual->SetClip(clip.Get());
-	translateTransform->SetOffsetX(-1 * (float)hostWindowRect.left - (GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER)));
-	translateTransform->SetOffsetY(-1 * (float)hostWindowRect.top - (GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CXPADDEDBORDER)));
-	rootVisual->SetTransform(translateTransform.Get());
+	mClip->SetLeft((float)hostWindowRect.left);
+	mClip->SetRight((float)hostWindowRect.right);
+	mClip->SetTop((float)hostWindowRect.top);
+	mClip->SetBottom((float)hostWindowRect.bottom);
+
+	mClip->SetTopLeftRadiusX(20);
+	mClip->SetTopLeftRadiusY(20);
+	mClip->SetTopRightRadiusX(20);
+	mClip->SetTopRightRadiusY(20);
+
+	mClip->SetBottomRightRadiusX(20);
+	mClip->SetBottomRightRadiusY(20);
+	mClip->SetBottomLeftRadiusX(20);
+	mClip->SetBottomLeftRadiusY(20);
+
+	mRootVisual->SetClip(mClip.Get());
+
+	mTranslateTransform->SetOffsetX(-1 * (float)hostWindowRect.left);
+	mTranslateTransform->SetOffsetY(-1 * (float)hostWindowRect.top);
+	mRootVisual->SetTransform(mTranslateTransform.Get());
 	Commit();
 	DwmFlush();
 }
@@ -281,9 +295,6 @@ bool AcrylicCompositor::Sync(HWND hwnd, int msg, WPARAM wParam, LPARAM lParam,bo
 			return true;
 		case WM_WINDOWPOSCHANGED:
 			SyncCoordinates(hwnd);
-			return true;
-		case WM_CLOSE:
-			delete[] hwndExclusionList;
 			return true;
 	}
 	return false;
@@ -321,7 +332,9 @@ void AcrylicCompositor::SyncFallbackVisual(bool active)
 
 	deviceContext->BeginDraw();
 	deviceContext->Clear();
-	deviceContext->FillRectangle(fallbackRect, fallbackBrush.Get());
+
+	D2D1_ROUNDED_RECT roundRect{ fallbackRect, 20, 20};
+	deviceContext->FillRoundedRectangle(roundRect, fallbackBrush.Get());
 	deviceContext->EndDraw();
 	swapChain->Present(1, 0);
 }
